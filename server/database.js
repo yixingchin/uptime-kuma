@@ -2,7 +2,6 @@ const fs = require("fs");
 const { R } = require("redbean-node");
 const { setSetting, setting } = require("./util-server");
 const { log, sleep } = require("../src/util");
-const dayjs = require("dayjs");
 const knex = require("knex");
 const { PluginsManager } = require("./plugins-manager");
 
@@ -22,6 +21,8 @@ class Database {
      * User Upload Dir (Default: ./data/upload)
      */
     static uploadDir;
+
+    static screenshotDir;
 
     static path;
 
@@ -70,6 +71,7 @@ class Database {
         "patch-api-key-table.sql": true,
         "patch-monitor-tls.sql": true,
         "patch-maintenance-cron.sql": true,
+        "patch-add-parent-monitor.sql": true,
     };
 
     /**
@@ -103,6 +105,12 @@ class Database {
 
         if (! fs.existsSync(Database.uploadDir)) {
             fs.mkdirSync(Database.uploadDir, { recursive: true });
+        }
+
+        // Create screenshot dir
+        Database.screenshotDir = Database.dataDir + "screenshots/";
+        if (! fs.existsSync(Database.screenshotDir)) {
+            fs.mkdirSync(Database.screenshotDir, { recursive: true });
         }
 
         log.info("db", `Data Dir: ${Database.dataDir}`);
@@ -416,6 +424,9 @@ class Database {
         process.addListener("unhandledRejection", listener);
 
         log.info("db", "Closing the database");
+
+        // Flush WAL to main database
+        await R.exec("PRAGMA wal_checkpoint(TRUNCATE)");
 
         while (true) {
             Database.noReject = true;
